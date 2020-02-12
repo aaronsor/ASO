@@ -1,0 +1,82 @@
+```Powershell
+#Crear Unidades Organizativas:
+foreach ($fichero in gc .\operaciones.txt){
+    switch($fichero.split(",")[0])
+    {
+      "ou1"{
+            $grados = $fichero.split(",")[1]
+            New-ADOrganizationalUnit -Name $fichero.split(",")[1] -Path "dc=andel,dc=local" -ProtectedFromAccidentalDeletion $false
+           }
+
+      "ou"{
+            New-ADOrganizationalUnit -Name $fichero.split(",")[1] -Path "ou=$grados,dc=andel,dc=local" -ProtectedFromAccidentalDeletion $false
+          }
+          
+     }
+  }
+  Start-Sleep -Seconds 1
+
+#Crear usuarios, grupos y meter a los usuarios en un grupo leyendo por fichero
+gc operaciones2.txt | %{
+    $directory = "C:\Users\Public"
+    New-aduser -name (($_).split(",")[0]) -sam (($_).split(",")[0]) -accountpassword (convertto-securestring "Andel_1928" -asplaintext -force) -enable $true -HomeDirectory $directory
+    New-ADGroup -name (($_).split(",")[1]) -GroupScope Global 
+    Add-ADGroupMember (($_).split(",")[2]) -Members (($_).split(",")[0])  
+     
+}
+Start-Sleep -Seconds 1
+
+#Mover grupos y usuarios a UO
+foreach($fichero in gc operaciones3.txt){
+    $ciclos = $fichero.split(",")[0]
+    $cursos = $fichero.split(",")[1]
+    $ous = $fichero.split(",")[2]
+    $user = $fichero.split(",")[3] 
+                   
+    Move-ADObject "CN=$cursos,CN=Users,DC=Andel,DC=local" -TargetPath "OU=$ous,OU=$ciclos,DC=Andel,DC=local"
+    Move-ADObject "CN=$user,CN=Users,DC=Andel,DC=local" -TargetPath "OU=$ous,OU=$ciclos,DC=Andel,DC=local"
+} 
+Start-Sleep -Seconds 1
+
+
+#Eliminar Unidades Organizativas 
+foreach($fichero in gc operaciones.txt){
+    $grados = $fichero.split(",")[1]
+    Remove-ADOrganizationalUnit -Identity "OU=$grados,DC=Andel,DC=local"  -Recursive 
+}
+
+##Deshabilitar los usuarios    
+$localusers = Get-LocalUser | Select Enabled,name
+foreach ($elemento in $localusers)
+{
+    if($localusers.Enabled -eq $false)
+       {
+     Move-ADObject "CN=Users,DC=andel,DC=local" -TargetPath "OU=Deshabilitadas,DC=Andel,DC=local"
+     #No se me mueven, a ver si lo podemos ver un dia en clase
+ }
+ }
+
+#Crear carpetas
+foreach($fichero in gc operaciones2.txt){
+    $carpeta = $fichero.Split(",")[3]
+    mkdir $carpeta
+    $ruta = "cd C:\Users\Public\Users" + $carpeta
+    New-SmbShare -name $carpeta -Path $ruta
+    #No se comparte 
+
+}
+  
+#Controlar cola de impresión
+function controlarcola($numero){
+    foreach($trabajo in Get-PrintJob "Microsoft XPS Document Writer".Count)
+    {
+        if($trabajo.Count -gt 10)
+        {
+            echo "Si hay mas de 10 se eliminan"
+            Remove-PrintJob -ID $trabajo.Id -PrinterName "Microsoft XPS Document Writer"
+        }
+    }
+}
+Powershell´´´
+
+       
